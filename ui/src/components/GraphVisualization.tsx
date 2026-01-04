@@ -48,7 +48,7 @@ const GraphVisualization = ({ data }: GraphVisualizationProps) => {
         shadow: true,
       },
       edges: {
-        width: 2,
+        width: 1,
         shadow: true,
         smooth: {
           enabled: true,
@@ -56,9 +56,11 @@ const GraphVisualization = ({ data }: GraphVisualizationProps) => {
           roundness: 0.5,
         },
         font: {
-          size: 12,
+          size: 14,
           color: "#ffffff",
           align: "middle",
+          strokeWidth: 0,
+          strokeColor: "transparent",
         },
       },
       physics: {
