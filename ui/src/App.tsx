@@ -32,6 +32,7 @@ import {
   Divider,
   Chip,
   InputLabel,
+  LinearProgress,
 } from "@mui/material";
 import BubbleChartIcon from "@mui/icons-material/BubbleChart";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -43,7 +44,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import HubIcon from "@mui/icons-material/Hub";
 import LinkIcon from "@mui/icons-material/Link";
 import GraphVisualization from "./components/GraphVisualization";
-import { searchWikipedia, generateGraph, GraphData, Edge } from "./api";
+import { searchWikipedia, GraphData, Edge } from "./api";
 
 const drawerWidth = 340;
 
@@ -64,10 +65,19 @@ function App() {
   const [edgeDialogOpen, setEdgeDialogOpen] = useState(false);
   const [tempSelectedNodes, setTempSelectedNodes] = useState<string[]>([]);
   const [tempSelectedEdges, setTempSelectedEdges] = useState<Edge[]>([]);
+  const [progress, setProgress] = useState(0);
+  const [progressStatus, setProgressStatus] = useState("");
+  const [totalChunks, setTotalChunks] = useState(0);
+  const [currentChunk, setCurrentChunk] = useState(0);
 
   const handleGenerate = async () => {
     setLoading(true);
     setError(null);
+    setProgress(0);
+    setProgressStatus("Starting...");
+    setTotalChunks(0);
+    setCurrentChunk(0);
+
     try {
       let text = "";
       if (inputMethod === "wikipedia") {
@@ -86,17 +96,59 @@ function App() {
         text = customText;
       }
 
-      const data = await generateGraph(text);
-      setGraphData(data);
-      setSelectedNodes(data.nodes.map((n) => n.id));
-      setSelectedEdges(data.edges);
-      setNodeFilterMode("all");
-      setEdgeFilterMode("all");
+      // Send POST data via fetch first
+      fetch("http://localhost:8000/api/generate-graph", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      }).then(async (response) => {
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) return;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = JSON.parse(line.substring(6));
+
+              if (data.error) {
+                setError(data.error);
+                setLoading(false);
+                return;
+              }
+
+              if (data.progress !== undefined) {
+                setProgress(data.progress);
+                setProgressStatus(data.status || "");
+                setTotalChunks(data.total || 0);
+                setCurrentChunk(data.current || 0);
+              }
+
+              if (data.done) {
+                setGraphData({ nodes: data.nodes, edges: data.edges });
+                setSelectedNodes(data.nodes.map((n: any) => n.id));
+                setSelectedEdges(data.edges);
+                setNodeFilterMode("all");
+                setEdgeFilterMode("all");
+                setLoading(false);
+              }
+            }
+          }
+        }
+      });
     } catch (err: any) {
       setError(
         err.response?.data?.detail || err.message || "An error occurred"
       );
-    } finally {
       setLoading(false);
     }
   };
@@ -500,17 +552,53 @@ function App() {
                   left: "50%",
                   transform: "translate(-50%, -50%)",
                   textAlign: "center",
+                  width: "80%",
+                  maxWidth: 500,
                 }}
               >
                 <Stack spacing={3} alignItems="center">
                   <CircularProgress size={64} thickness={4} />
-                  <Box>
+                  <Box sx={{ width: "100%" }}>
                     <Typography variant="h6" color="text.primary" gutterBottom>
                       Generating Knowledge Graph
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Analyzing text and extracting entities...
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      {progressStatus ||
+                        "Analyzing text and extracting entities..."}
                     </Typography>
+
+                    {totalChunks > 1 && (
+                      <Box sx={{ width: "100%", mt: 2 }}>
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          sx={{ mb: 1 }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Chunk {currentChunk} of {totalChunks}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {Math.round(progress)}%
+                          </Typography>
+                        </Stack>
+                        <LinearProgress
+                          variant="determinate"
+                          value={progress}
+                          sx={{
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                            "& .MuiLinearProgress-bar": {
+                              borderRadius: 4,
+                            },
+                          }}
+                        />
+                      </Box>
+                    )}
                   </Box>
                 </Stack>
               </Box>
