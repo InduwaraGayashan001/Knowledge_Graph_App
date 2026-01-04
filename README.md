@@ -1,6 +1,6 @@
 # **NeuroGraph** - Knowledge Graph Generator
 
-![NeuroGraph](resources/demo.mp4)
+![Home](resources/home.png)
 
 A web application that generates interactive knowledge graphs from Wikipedia articles or custom text using advanced language models.
 
@@ -129,6 +129,11 @@ npm run dev
    - Click **Reset Filters** to restore the complete graph
 
     ![Filter](resources/filter.png)
+
+   
+## NeuroGraph Demo
+
+https://github.com/user-attachments/assets/6b795499-9ed4-45f2-9ac6-c75a96abdf0e
 
 > **Important Notes:**  
 > - If a Wikipedia search query doesn't exist or cannot be found, the application will return an error.
