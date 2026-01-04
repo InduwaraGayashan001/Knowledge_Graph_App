@@ -1,7 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
+import json
+import asyncio
 
 from wikipedia_search import search_wikipedia
 from generate_knowledge_graph import generate_knowledge_graph
@@ -56,52 +59,76 @@ async def wikipedia_search(request: WikipediaSearchRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/generate-graph", response_model=GraphResponse)
+@app.post("/api/generate-graph")
 async def generate_graph(request: CustomTextRequest):
-    """Generate knowledge graph from text."""
-    try:
-        graph_documents = await generate_knowledge_graph(request.text)
-        
-        if not graph_documents or len(graph_documents) == 0:
-            raise HTTPException(status_code=400, detail="No graph generated")
-        
-        # Extract nodes and edges
-        nodes_data = []
-        edges_data = []
-        
-        graph_doc = graph_documents[0]
-        node_dict = {node.id: node for node in graph_doc.nodes}
-        
-        # Collect valid edges
-        for rel in graph_doc.relationships:
-            if rel.source.id in node_dict and rel.target.id in node_dict:
-                edges_data.append({
-                    "source": rel.source.id,
-                    "target": rel.target.id,
-                    "type": rel.type
+    """Generate knowledge graph from text with progress updates."""
+    
+    async def event_stream():
+        try:
+            progress_queue = asyncio.Queue()
+            
+            # Start graph generation in background
+            async def generate_with_progress():
+                return await generate_knowledge_graph(request.text, progress_callback=progress_queue)
+            
+            generation_task = asyncio.create_task(generate_with_progress())
+            
+            # Stream progress updates
+            while not generation_task.done():
+                try:
+                    progress = await asyncio.wait_for(progress_queue.get(), timeout=0.1)
+                    yield f"data: {json.dumps(progress)}\n\n"
+                except asyncio.TimeoutError:
+                    continue
+            
+            # Get the result
+            graph_documents = await generation_task
+            
+            if not graph_documents or len(graph_documents) == 0:
+                yield f"data: {json.dumps({'error': 'No graph generated'})}\n\n"
+                return
+            
+            # Extract nodes and edges
+            nodes_data = []
+            edges_data = []
+            
+            graph_doc = graph_documents[0]
+            node_dict = {node.id: node for node in graph_doc.nodes}
+            
+            # Collect valid edges
+            for rel in graph_doc.relationships:
+                if rel.source.id in node_dict and rel.target.id in node_dict:
+                    edges_data.append({
+                        "source": rel.source.id,
+                        "target": rel.target.id,
+                        "type": rel.type
+                    })
+            
+            # Collect nodes that are part of relationships
+            connected_node_ids = set()
+            for edge in edges_data:
+                connected_node_ids.add(edge["source"])
+                connected_node_ids.add(edge["target"])
+            
+            # Add only connected nodes
+            for node_id in connected_node_ids:
+                node = node_dict[node_id]
+                nodes_data.append({
+                    "id": node.id,
+                    "type": node.type
                 })
-        
-        # Collect nodes that are part of relationships
-        connected_node_ids = set()
-        for edge in edges_data:
-            connected_node_ids.add(edge["source"])
-            connected_node_ids.add(edge["target"])
-        
-        # Add only connected nodes
-        for node_id in connected_node_ids:
-            node = node_dict[node_id]
-            nodes_data.append({
-                "id": node.id,
-                "type": node.type
-            })
-        
-        return {
-            "nodes": nodes_data,
-            "edges": edges_data
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            
+            result = {
+                "done": True,
+                "nodes": nodes_data,
+                "edges": edges_data
+            }
+            yield f"data: {json.dumps(result)}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 @app.post("/api/filter-graph", response_model=GraphResponse)
 async def filter_graph(request: NodeFilterRequest):

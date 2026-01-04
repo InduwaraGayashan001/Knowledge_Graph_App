@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def generate_knowledge_graph(text: str):
+async def generate_knowledge_graph(text: str, progress_callback=None):
     """Generate a knowledge graph from the provided data."""
 
     load_dotenv()
@@ -44,12 +44,23 @@ async def generate_knowledge_graph(text: str):
         chunks = text_splitter.split_text(text)
         logger.info(f"Split text into {len(chunks)} chunks")
         
+        if progress_callback:
+            await progress_callback.put({"progress": 0, "total": len(chunks), "current": 0, "status": "Starting"})
+        
         documents = [Document(page_content=chunk) for chunk in chunks]
         
         # Process all chunks and merge results
         all_graph_docs = []
         for idx, doc in enumerate(documents, 1):
             logger.info(f"Processing chunk {idx}/{len(chunks)} ({len(doc.page_content)} characters)")
+            
+            if progress_callback:
+                await progress_callback.put({
+                    "progress": (idx - 1) / len(chunks) * 100,
+                    "total": len(chunks),
+                    "current": idx,
+                    "status": f"Processing chunk {idx} of {len(chunks)}"
+                })
             
             try:
                 graph_docs = await graph_transformer.aconvert_to_graph_documents([doc])
@@ -65,10 +76,22 @@ async def generate_knowledge_graph(text: str):
                 logger.error(f"Error processing chunk {idx}/{len(chunks)}: {str(e)}")
                 raise
         
+        if progress_callback:
+            await progress_callback.put({"progress": 100, "total": len(chunks), "current": len(chunks), "status": "Complete"})
+        
         logger.info(f"Chunking complete. Total graph documents: {len(all_graph_docs)}")
         return all_graph_docs
     else:
         logger.info("Text within token limit. Processing normally...")
+        
+        if progress_callback:
+            await progress_callback.put({"progress": 50, "total": 1, "current": 1, "status": "Processing"})
+        
         # Process normally if within token limit
         documents = [Document(page_content=text)]
-        return await graph_transformer.aconvert_to_graph_documents(documents)
+        result = await graph_transformer.aconvert_to_graph_documents(documents)
+        
+        if progress_callback:
+            await progress_callback.put({"progress": 100, "total": 1, "current": 1, "status": "Complete"})
+        
+        return result
