@@ -1,6 +1,6 @@
 # **NeuroGraph** - Knowledge Graph Generator
 
-![NeuroGraph](resources/home.png)
+![NeuroGraph](resources/demo.mp4)
 
 A web application that generates interactive knowledge graphs from Wikipedia articles or custom text using advanced language models.
 
