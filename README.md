@@ -8,6 +8,7 @@ A web application that generates interactive knowledge graphs from Wikipedia art
 
 - **Wikipedia Search:** Search and extract content from any Wikipedia article.
 - **Custom Text Input:** Generate graphs from your own text content.
+- **File Upload:** Upload PDF or TXT files to generate knowledge graphs from documents.
 - **AI-Powered Analysis:** Extracts entities and relationships using LLMs.
 - **Interactive Visualization:** Explore and manipulate the generated graph with drag, zoom, and filter capabilities.
 - **Advanced Filtering:** Customize which nodes and edges to display with dropdown filters and dialog selection.
@@ -109,6 +110,7 @@ npm run dev
 2. Choose your input method:
    - **Wikipedia Search:** Enter a topic to search
    - **Custom Text:** Paste or type your own text
+   - **Upload File:** Upload a PDF or TXT file to extract content
 
     ![Select](resources/wikipedia.png)
 
@@ -130,11 +132,8 @@ npm run dev
 
     ![Filter](resources/filter.png)
 
-   
-## NeuroGraph Demo
-
-https://github.com/user-attachments/assets/6b795499-9ed4-45f2-9ac6-c75a96abdf0e
 
 > **Important Notes:**  
 > - If a Wikipedia search query doesn't exist or cannot be found, the application will return an error.
-> - Text inputs that exceed the maximum token limit of **8000 tokens** will result in an error.
+> - Uploaded files must be in PDF or TXT format. PDFs should contain extractable text (not scanned images).
+> - Large files may take longer to process depending on the content size.
