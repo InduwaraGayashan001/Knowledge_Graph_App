@@ -25,6 +25,18 @@ export const searchWikipedia = async (query: string): Promise<string> => {
   return response.data.text;
 };
 
+export const uploadFile = async (file: File): Promise<{ text: string; filename: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await axios.post(`${API_BASE_URL}/api/upload-file`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
 export const generateGraph = async (text: string): Promise<GraphData> => {
   const response = await axios.post(`${API_BASE_URL}/api/generate-graph`, {
     text,

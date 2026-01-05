@@ -43,17 +43,19 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import HubIcon from "@mui/icons-material/Hub";
 import LinkIcon from "@mui/icons-material/Link";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import GraphVisualization from "./components/GraphVisualization";
-import { searchWikipedia, GraphData, Edge } from "./api";
+import { searchWikipedia, uploadFile, GraphData, Edge } from "./api";
 
 const drawerWidth = 340;
 
 function App() {
-  const [inputMethod, setInputMethod] = useState<"wikipedia" | "custom">(
-    "wikipedia"
-  );
+  const [inputMethod, setInputMethod] = useState<
+    "wikipedia" | "custom" | "file"
+  >("wikipedia");
   const [query, setQuery] = useState("");
   const [customText, setCustomText] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
@@ -87,6 +89,14 @@ function App() {
           return;
         }
         text = await searchWikipedia(query);
+      } else if (inputMethod === "file") {
+        if (!selectedFile) {
+          setError("Please select a file");
+          setLoading(false);
+          return;
+        }
+        const result = await uploadFile(selectedFile);
+        text = result.text;
       } else {
         if (!customText.trim()) {
           setError("Please enter some text");
@@ -315,7 +325,9 @@ function App() {
             <RadioGroup
               value={inputMethod}
               onChange={(e) =>
-                setInputMethod(e.target.value as "wikipedia" | "custom")
+                setInputMethod(
+                  e.target.value as "wikipedia" | "custom" | "file"
+                )
               }
             >
               <FormControlLabel
@@ -338,6 +350,16 @@ function App() {
                   </Stack>
                 }
               />
+              <FormControlLabel
+                value="file"
+                control={<Radio />}
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <UploadFileIcon fontSize="small" />
+                    <span>Upload File</span>
+                  </Stack>
+                }
+              />
             </RadioGroup>
           </FormControl>
 
@@ -355,6 +377,37 @@ function App() {
                 ),
               }}
             />
+          ) : inputMethod === "file" ? (
+            <Box>
+              <input
+                accept=".pdf,.txt"
+                style={{ display: "none" }}
+                id="file-upload"
+                type="file"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setSelectedFile(file);
+                  }
+                }}
+              />
+              <label htmlFor="file-upload">
+                <Button
+                  variant="outlined"
+                  component="span"
+                  fullWidth
+                  startIcon={<UploadFileIcon />}
+                  sx={{ mb: 2 }}
+                >
+                  Choose File (PDF/TXT)
+                </Button>
+              </label>
+              {selectedFile && (
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  Selected: {selectedFile.name}
+                </Alert>
+              )}
+            </Box>
           ) : (
             <TextField
               label="Custom Text"
