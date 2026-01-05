@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import json
 import asyncio
+import io
+from PyPDF2 import PdfReader
 
 from wikipedia_search import search_wikipedia
 from generate_knowledge_graph import generate_knowledge_graph
@@ -25,6 +27,9 @@ class WikipediaSearchRequest(BaseModel):
 
 class CustomTextRequest(BaseModel):
     text: str
+
+class PDFUploadRequest(BaseModel):
+    pdf_base64: str  # Base64 encoded PDF content
 
 class NodeFilterRequest(BaseModel):
     text: str
@@ -56,6 +61,55 @@ async def wikipedia_search(request: WikipediaSearchRequest):
         if "error occurred" in text.lower():
             raise HTTPException(status_code=400, detail=text)
         return {"text": text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/upload-file")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload and extract text from PDF or TXT file."""
+    try:
+        # Check file type
+        file_extension = file.filename.split('.')[-1].lower() if file.filename else ""
+        
+        if file_extension not in ['pdf', 'txt']:
+            raise HTTPException(
+                status_code=400, 
+                detail="Only PDF and TXT files are supported"
+            )
+        
+        # Read file content
+        content = await file.read()
+        
+        # Extract text based on file type
+        if file_extension == 'pdf':
+            # Extract text from PDF
+            pdf_reader = PdfReader(io.BytesIO(content))
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+            
+            if not text.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Could not extract text from PDF"
+                )
+        else:  # txt file
+            try:
+                text = content.decode('utf-8')
+            except UnicodeDecodeError:
+                # Try different encodings
+                try:
+                    text = content.decode('latin-1')
+                except:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Could not decode text file"
+                    )
+        
+        return {"text": text, "filename": file.filename}
+    
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

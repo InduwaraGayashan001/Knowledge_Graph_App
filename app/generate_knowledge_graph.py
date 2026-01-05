@@ -66,12 +66,7 @@ async def generate_knowledge_graph(text: str, progress_callback=None):
                 graph_docs = await graph_transformer.aconvert_to_graph_documents([doc])
                 all_graph_docs.extend(graph_docs)
                 logger.info(f"Chunk {idx}/{len(chunks)} processed: {len(graph_docs)} graph documents generated")
-                
-                # Add delay between chunks to avoid rate limiting (except for the last chunk)
-                if idx < len(chunks):
-                    logger.info(f"Waiting 5 seconds before processing next chunk to avoid rate limits...")
-                    await asyncio.sleep(5)
-                    
+                                    
             except Exception as e:
                 logger.error(f"Error processing chunk {idx}/{len(chunks)}: {str(e)}")
                 raise
